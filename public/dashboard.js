@@ -1,7 +1,9 @@
+// API Configuration
+const API_BASE_URL = 'http://localhost:5000/api';
+
 // Local Storage Keys
 const STORAGE_KEYS = {
-    CANDIDATES: 'admin_dashboard_candidates',
-    USERS: 'admin_dashboard_users',
+    TOKEN: 'admin_dashboard_token',
     CURRENT_USER: 'admin_dashboard_current_user'
 };
 
@@ -22,8 +24,11 @@ const modalTitle = document.getElementById('modalTitle');
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize with sample data if empty
-    initializeSampleData();
+    // Check authentication
+    if (!checkAuth()) {
+        window.location.href = '/';
+        return;
+    }
     
     // Load user info
     loadUserInfo();
@@ -35,72 +40,19 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
-// Initialize sample data
-function initializeSampleData() {
-    const existingCandidates = localStorage.getItem(STORAGE_KEYS.CANDIDATES);
-    if (!existingCandidates) {
-        const sampleCandidates = [
-            {
-                _id: '1',
-                firstName: 'John',
-                lastName: 'Doe',
-                email: 'john.doe@email.com',
-                phone: '+1-555-0123',
-                position: 'Frontend Developer',
-                experience: 3,
-                skills: ['JavaScript', 'React', 'HTML', 'CSS'],
-                education: {
-                    degree: 'Bachelor of Computer Science',
-                    institution: 'Tech University',
-                    year: 2020
-                },
-                status: 'Applied',
-                notes: 'Strong React skills, good communication',
-                createdAt: new Date('2024-01-15').toISOString(),
-                updatedAt: new Date('2024-01-15').toISOString()
-            },
-            {
-                _id: '2',
-                firstName: 'Jane',
-                lastName: 'Smith',
-                email: 'jane.smith@email.com',
-                phone: '+1-555-0456',
-                position: 'Backend Developer',
-                experience: 5,
-                skills: ['Node.js', 'Python', 'MongoDB', 'Express'],
-                education: {
-                    degree: 'Master of Software Engineering',
-                    institution: 'Engineering College',
-                    year: 2019
-                },
-                status: 'Interviewing',
-                notes: 'Excellent problem-solving skills',
-                createdAt: new Date('2024-01-10').toISOString(),
-                updatedAt: new Date('2024-01-12').toISOString()
-            },
-            {
-                _id: '3',
-                firstName: 'Mike',
-                lastName: 'Johnson',
-                email: 'mike.johnson@email.com',
-                phone: '+1-555-0789',
-                position: 'UI/UX Designer',
-                experience: 4,
-                skills: ['Figma', 'Adobe XD', 'Sketch', 'Prototyping'],
-                education: {
-                    degree: 'Bachelor of Design',
-                    institution: 'Design Institute',
-                    year: 2020
-                },
-                status: 'Hired',
-                notes: 'Creative designer with strong portfolio',
-                createdAt: new Date('2024-01-05').toISOString(),
-                updatedAt: new Date('2024-01-08').toISOString()
-            }
-        ];
-        localStorage.setItem(STORAGE_KEYS.CANDIDATES, JSON.stringify(sampleCandidates));
+// Check authentication
+function checkAuth() {
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    const user = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    
+    if (!token || !user) {
+        return false;
     }
+    
+    return true;
 }
+
+
 
 // Load user information
 function loadUserInfo() {
@@ -133,23 +85,33 @@ function setupEventListeners() {
     });
 }
 
-// Load candidates from localStorage
-function loadCandidates() {
+// Load candidates from API
+async function loadCandidates() {
     try {
-        const storedCandidates = localStorage.getItem(STORAGE_KEYS.CANDIDATES);
-        candidates = storedCandidates ? JSON.parse(storedCandidates) : [];
-        renderCandidates(candidates);
-        updateAnalytics();
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+        const response = await fetch(`${API_BASE_URL}/candidates`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            candidates = data;
+            renderCandidates(candidates);
+            updateAnalytics();
+        } else {
+            console.error('Error loading candidates:', response.statusText);
+            candidates = [];
+            renderCandidates(candidates);
+        }
     } catch (error) {
         console.error('Error loading candidates:', error);
         candidates = [];
         renderCandidates(candidates);
     }
-}
-
-// Save candidates to localStorage
-function saveCandidates() {
-    localStorage.setItem(STORAGE_KEYS.CANDIDATES, JSON.stringify(candidates));
 }
 
 // Generate unique ID
@@ -267,7 +229,7 @@ function closeModal() {
 }
 
 // Handle form submission
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
     e.preventDefault();
     
     const formData = {
@@ -287,34 +249,44 @@ function handleFormSubmit(e) {
         notes: document.getElementById('notes').value
     };
     
-    if (isEditing) {
-        // Update existing candidate
-        const index = candidates.findIndex(c => c._id === currentCandidate._id);
-        if (index !== -1) {
-            candidates[index] = {
-                ...currentCandidate,
-                ...formData,
-                updatedAt: new Date().toISOString()
-            };
+    try {
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+        let response;
+        
+        if (isEditing) {
+            // Update existing candidate
+            response = await fetch(`${API_BASE_URL}/candidates/${currentCandidate._id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+        } else {
+            // Add new candidate
+            response = await fetch(`${API_BASE_URL}/candidates`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
         }
-    } else {
-        // Add new candidate
-        const newCandidate = {
-            _id: generateId(),
-            ...formData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-        candidates.unshift(newCandidate);
+        
+        if (response.ok) {
+            closeModal();
+            loadCandidates();
+            showNotification(isEditing ? 'Candidate updated successfully!' : 'Candidate added successfully!', 'success');
+        } else {
+            const errorData = await response.json();
+            showNotification(errorData.message || 'Operation failed', 'error');
+        }
+    } catch (error) {
+        console.error('Form submission error:', error);
+        showNotification('Network error. Please try again.', 'error');
     }
-    
-    // Save to localStorage
-    saveCandidates();
-    
-    // Update UI
-    closeModal();
-    loadCandidates();
-    showNotification(isEditing ? 'Candidate updated successfully!' : 'Candidate added successfully!', 'success');
 }
 
 // Delete candidate
@@ -330,19 +302,31 @@ function closeDeleteModal() {
 }
 
 // Confirm delete
-function confirmDelete() {
+async function confirmDelete() {
     if (!currentCandidate) return;
     
-    // Remove from array
-    candidates = candidates.filter(c => c._id !== currentCandidate._id);
-    
-    // Save to localStorage
-    saveCandidates();
-    
-    // Update UI
-    closeDeleteModal();
-    loadCandidates();
-    showNotification('Candidate deleted successfully!', 'success');
+    try {
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+        const response = await fetch(`${API_BASE_URL}/candidates/${currentCandidate._id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            closeDeleteModal();
+            loadCandidates();
+            showNotification('Candidate deleted successfully!', 'success');
+        } else {
+            const errorData = await response.json();
+            showNotification(errorData.message || 'Delete failed', 'error');
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+        showNotification('Network error. Please try again.', 'error');
+    }
 }
 
 // Update analytics
@@ -396,6 +380,7 @@ function showSection(sectionName) {
 // Logout function
 function logout() {
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
     window.location.href = '/';
 }
 

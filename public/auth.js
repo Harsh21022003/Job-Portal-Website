@@ -1,6 +1,9 @@
+// API Configuration
+const API_BASE_URL = 'http://localhost:5000/api';
+
 // Local Storage Keys
 const STORAGE_KEYS = {
-    USERS: 'admin_dashboard_users',
+    TOKEN: 'admin_dashboard_token',
     CURRENT_USER: 'admin_dashboard_current_user'
 };
 
@@ -8,24 +11,6 @@ const STORAGE_KEYS = {
 const loginForm = document.getElementById('loginForm');
 const signupForm = document.getElementById('signupForm');
 const messageDiv = document.getElementById('message');
-
-// Initialize sample users
-function initializeUsers() {
-    const existingUsers = localStorage.getItem(STORAGE_KEYS.USERS);
-    if (!existingUsers) {
-        const sampleUsers = [
-            {
-                id: '1',
-                username: 'admin',
-                email: 'admin@example.com',
-                password: 'admin123', // In real app, this would be hashed
-                role: 'admin',
-                createdAt: new Date().toISOString()
-            }
-        ];
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(sampleUsers));
-    }
-}
 
 // Show/Hide tabs
 function showTab(tabName) {
@@ -72,36 +57,45 @@ function validatePassword(password) {
 }
 
 // Handle login
-loginForm.addEventListener('submit', (e) => {
+loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     
-    // Get users from localStorage
-    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-    
-    // Find user
-    const user = users.find(u => u.email === email && u.password === password);
-    
-    if (user) {
-        // Store current user (without password)
-        const { password: _, ...userWithoutPassword } = user;
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(userWithoutPassword));
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password })
+        });
         
-        showMessage('Login successful! Redirecting...', 'success');
+        const data = await response.json();
         
-        // Redirect to dashboard
-        setTimeout(() => {
-            window.location.href = '/dashboard';
-        }, 1000);
-    } else {
-        showMessage('Invalid email or password', 'error');
+        if (response.ok) {
+            // Store token and user data
+            localStorage.setItem(STORAGE_KEYS.TOKEN, data.token);
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(data.user));
+            
+            showMessage('Login successful! Redirecting...', 'success');
+            
+            // Redirect to dashboard
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 1000);
+        } else {
+            showMessage(data.message || 'Login failed', 'error');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showMessage('Network error. Please try again.', 'error');
     }
 });
 
 // Handle signup
-signupForm.addEventListener('submit', (e) => {
+signupForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const username = document.getElementById('signupUsername').value;
@@ -124,50 +118,44 @@ signupForm.addEventListener('submit', (e) => {
         return;
     }
     
-    // Get existing users
-    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-    
-    // Check if user already exists
-    const existingUser = users.find(u => u.email === email || u.username === username);
-    if (existingUser) {
-        showMessage('User already exists with this email or username', 'error');
-        return;
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Store token and user data
+            localStorage.setItem(STORAGE_KEYS.TOKEN, data.token);
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(data.user));
+            
+            showMessage('Registration successful! Redirecting...', 'success');
+            
+            // Redirect to dashboard
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 1000);
+        } else {
+            showMessage(data.message || 'Registration failed', 'error');
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        showMessage('Network error. Please try again.', 'error');
     }
-    
-    // Create new user
-    const newUser = {
-        id: Date.now().toString(),
-        username,
-        email,
-        password, // In real app, this would be hashed
-        role: 'admin',
-        createdAt: new Date().toISOString()
-    };
-    
-    // Add to users array
-    users.push(newUser);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-    
-    // Store current user (without password)
-    const { password: _, ...userWithoutPassword } = newUser;
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(userWithoutPassword));
-    
-    showMessage('Registration successful! Redirecting...', 'success');
-    
-    // Redirect to dashboard
-    setTimeout(() => {
-        window.location.href = '/dashboard';
-    }, 1000);
 });
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize sample users
-    initializeUsers();
-    
     // Check if user is already logged in
     const currentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (currentUser) {
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    
+    if (currentUser && token) {
         window.location.href = '/dashboard';
     }
 }); 
