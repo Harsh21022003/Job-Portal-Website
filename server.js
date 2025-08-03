@@ -6,7 +6,7 @@ require('dotenv').config();
 
 // Set JWT secret if not in environment
 if (!process.env.JWT_SECRET) {
-    process.env.JWT_SECRET = '8RbImioAAQc2sGz08e6CIIzEcIApSOYAVzacP_GwFPD0_DXVtk5BUepWZpH_43jY';
+    process.env.JWT_SECRET = '';
 }
 
 const app = express();
@@ -20,7 +20,7 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://harshshrivastava0021:asdfghjkl@cluster0.jmp3vkp.mongodb.net/';
+const MONGODB_URI = process.env.MONGODB_URI || '';
 mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
